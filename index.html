@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AIUEO Music Editor</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="toolbar">
+    <h1>あいうえお<span>MusicEditor</span></h1>
+    <div class="group">
+      <label class="btn" title="動画または音声ファイルを読み込む">素材を開く<input type="file" id="mediaInput" accept="video/*,audio/*" hidden></label>
+      <button id="demoBtn" title="合成音声の「あいうえお」で試す">デモ</button>
+    </div>
+    <div class="group">
+      <button id="homeBtn" title="先頭へ (Home)">⏮</button>
+      <button id="playBtn" class="play" title="再生 / 停止 (Space)">▶</button>
+      <span id="timeDisplay" class="time">1 : 1 . 00</span>
+    </div>
+    <div class="group">
+      <label>BPM <input type="number" id="bpmInput" min="20" max="400" step="0.1" value="120"></label>
+      <label>スナップ
+        <select id="snapSelect">
+          <option value="4">1/1</option>
+          <option value="2">1/2</option>
+          <option value="1">1/4</option>
+          <option value="0.5" selected>1/8</option>
+          <option value="0.25">1/16</option>
+          <option value="0.125">1/32</option>
+          <option value="0">オフ</option>
+        </select>
+      </label>
+    </div>
+    <div class="group">
+      <button id="toolDraw" class="tool active" title="鉛筆ツール (D)">✏ 鉛筆</button>
+      <button id="toolSelect" class="tool" title="選択ツール (S)">⬚ 選択</button>
+    </div>
+    <div class="group">
+      <button id="undoBtn" title="元に戻す (Ctrl+Z)">↶</button>
+      <button id="redoBtn" title="やり直す (Ctrl+Y)">↷</button>
+      <button id="lyricPourBtn" title="選択したノートに歌詞をまとめて入力">歌詞流し込み</button>
+    </div>
+    <div class="group right">
+      <button id="newBtn">新規</button>
+      <button id="saveBtn">保存</button>
+      <label class="btn">開く<input type="file" id="projectInput" accept=".json,application/json" hidden></label>
+      <button id="exportWavBtn">WAV書き出し</button>
+      <button id="exportVideoBtn">動画書き出し</button>
+      <button id="helpBtn" title="操作説明">?</button>
+    </div>
+  </header>
+
+  <main>
+    <aside class="side">
+      <section class="panel">
+        <h2>プレビュー</h2>
+        <canvas id="previewCanvas" width="1280" height="720"></canvas>
+        <div class="opts">
+          <label><input type="checkbox" id="optShowLyrics"> 歌詞を表示</label>
+          <label><input type="checkbox" id="optHoldFrame"> 休符で映像を静止</label>
+          <label><input type="checkbox" id="optLoop"> 短いクリップをループ</label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>素材 <small id="mediaName">未読み込み</small></h2>
+        <video id="sourceVideo" controls playsinline></video>
+        <canvas id="waveCanvas"></canvas>
+        <div class="hint">ドラッグ: 範囲選択 / ホイール: 拡大縮小 / Shift+ホイール: 移動</div>
+      </section>
+
+      <section class="panel clips">
+        <h2>クリップ（音素）</h2>
+        <div class="clip-actions">
+          <button id="newClipBtn" title="波形の選択範囲から新しいクリップを作る">＋ 選択範囲からクリップ作成</button>
+        </div>
+        <div class="clip-editor" id="clipEditor">
+          <label>名前 <input type="text" id="clipName" placeholder="例: あ"></label>
+          <label>開始 <input type="number" id="clipStart" step="0.001" min="0"></label>
+          <label>終了 <input type="number" id="clipEnd" step="0.001" min="0"></label>
+          <label>原音の高さ <input type="number" id="clipPitch" min="0" max="127"> <span id="clipPitchName"></span></label>
+          <div class="row">
+            <button id="clipPlayBtn">▶ 試聴</button>
+            <button id="clipDetectBtn" title="自己相関で音程を推定">音程推定</button>
+            <button id="clipDeleteBtn" class="danger">削除</button>
+          </div>
+        </div>
+        <ul id="clipList"></ul>
+      </section>
+    </aside>
+
+    <section class="editor">
+      <div class="roll-wrap" id="rollWrap">
+        <canvas id="rollCanvas" tabindex="0"></canvas>
+        <input id="lyricInput" list="clipNames" autocomplete="off" hidden>
+      </div>
+      <datalist id="clipNames"></datalist>
+      <div class="props" id="noteProps">
+        <span class="muted" id="propsEmpty">ノートを選択するとプロパティを編集できます</span>
+        <div id="propsBody" hidden>
+          <label>歌詞 <input type="text" id="propLyric" list="clipNames" size="6"></label>
+          <span id="propPitch" class="tag"></span>
+          <label>音量 <input type="range" id="propVolume" min="0" max="2" step="0.01"></label>
+          <label><input type="checkbox" id="propFlip"> 左右反転</label>
+          <span id="propCount" class="muted"></span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="status">素材を開くか「デモ」を押して始めましょう。</footer>
+
+  <dialog id="helpDialog">
+    <h2>使い方</h2>
+    <ol>
+      <li><b>素材を開く</b>で動画（または音声）を読み込みます。</li>
+      <li>波形をドラッグして「あ」「い」などの音の範囲を選び、<b>＋ 選択範囲からクリップ作成</b>。名前を「あ」にします。</li>
+      <li><b>原音の高さ</b>を設定（<b>音程推定</b>で自動推定も可）。ここが正しいと、ノートの高さ通りに音程変更されます。</li>
+      <li>ピアノロールに鉛筆でノートを置き、ダブルクリックで歌詞を入力。<b>歌詞と同じ名前のクリップ</b>が、映像ごと鳴ります。</li>
+    </ol>
+    <h3>ショートカット</h3>
+    <table>
+      <tr><td>Space</td><td>再生 / 停止</td></tr>
+      <tr><td>Home</td><td>先頭へ</td></tr>
+      <tr><td>D / S</td><td>鉛筆 / 選択ツール</td></tr>
+      <tr><td>ダブルクリック / Enter</td><td>歌詞入力（Tab で次のノートへ）</td></tr>
+      <tr><td>右クリック / Delete</td><td>ノート削除</td></tr>
+      <tr><td>↑ ↓ (Shift でオクターブ)</td><td>選択ノートの音程変更</td></tr>
+      <tr><td>← →</td><td>選択ノートを移動</td></tr>
+      <tr><td>Ctrl+C / Ctrl+V</td><td>コピー / 再生位置へ貼り付け</td></tr>
+      <tr><td>Ctrl+A</td><td>全選択</td></tr>
+      <tr><td>Ctrl+Z / Ctrl+Y</td><td>元に戻す / やり直す</td></tr>
+      <tr><td>F</td><td>選択ノートの左右反転</td></tr>
+      <tr><td>Ctrl+ホイール / Alt+ホイール</td><td>横 / 縦の拡大縮小</td></tr>
+      <tr><td>Shift+ドラッグ（空白）</td><td>範囲選択</td></tr>
+    </table>
+    <form method="dialog"><button>閉じる</button></form>
+  </dialog>
+
+  <script src="src/state.js"></script>
+  <script src="src/audio.js"></script>
+  <script src="src/preview.js"></script>
+  <script src="src/pianoroll.js"></script>
+  <script src="src/sourceview.js"></script>
+  <script src="src/main.js"></script>
+</body>
+</html>
